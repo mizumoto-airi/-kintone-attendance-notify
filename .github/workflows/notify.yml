@@ -1,25 +1,25 @@
- name: notify
+name: notify
 
-  "on":
-    schedule:
-      - cron: '0 23 * * 0-4'
-    workflow_dispatch:
+on:
+  schedule:
+    - cron: '0 23 * * 0-4'
+  workflow_dispatch:
 
-  jobs:
-    notify:
-      runs-on: ubuntu-latest
-      steps:
-        - name: checkout
-          uses: actions/checkout@v4
-        - name: setup python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.11'
-        - name: install requests
-          run: pip install requests
-        - name: run script
-          env:
-            KINTONE_USERNAME: ${{ secrets.KINTONE_USERNAME }}
-            KINTONE_PASSWORD: ${{ secrets.KINTONE_PASSWORD }}
-            TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-          run: python notify.py
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: install requests
+        run: pip install requests
+      - name: run script
+        env:
+          KINTONE_USERNAME: ${{ secrets.KINTONE_USERNAME }}
+          KINTONE_PASSWORD: ${{ secrets.KINTONE_PASSWORD }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: python notify.py
