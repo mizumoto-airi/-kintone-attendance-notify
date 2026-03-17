@@ -1,0 +1,30 @@
+ name: 休暇通知
+
+  on:
+    schedule:
+      # 毎週月〜金の朝8時（日本時間）に実行
+      # GitHubはUTC基準のため、JST-9時間 = 前日の23:00 UTC
+      - cron: '0 23 * * 0-4'
+    workflow_dispatch: # 手動でも実行できるようにする
+
+  jobs:
+    notify:
+      runs-on: ubuntu-latest
+      steps:
+        - name: リポジトリをチェックアウト
+          uses: actions/checkout@v4
+
+        - name: Pythonのセットアップ
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+
+        - name: ライブラリのインストール
+          run: pip install requests
+
+        - name: 通知スクリプトを実行
+          env:
+            KINTONE_USERNAME: ${{ secrets.KINTONE_USERNAME }}
+            KINTONE_PASSWORD: ${{ secrets.KINTONE_PASSWORD }}
+            TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          run: python notify.py
