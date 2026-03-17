@@ -27,10 +27,7 @@ def get_today_leaves():
     today = datetime.now(JST)
     today_start = today.strftime("%Y-%m-%dT00:00:00+09:00")
     today_end = today.strftime("%Y-%m-%dT23:59:59+09:00")
-    query = (
-        f'届出ステータス in ("届出「承認済」") '
-        f'and From <= "{today_end}" and To >= "{today_start}"'
-    )
+    query = f'From <= "{today_end}" and To >= "{today_start}"'
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     params = {
         "app": LEAVE_APP_ID,
