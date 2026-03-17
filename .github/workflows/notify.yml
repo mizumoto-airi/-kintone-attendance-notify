@@ -1,6 +1,6 @@
  name: 休暇通知
 
-  on:
+  "on":
     schedule:
       # 毎週月〜金の朝8時（日本時間）に実行
       # GitHubはUTC基準のため、JST-9時間 = 前日の23:00 UTC
