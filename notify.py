@@ -34,7 +34,9 @@ def get_today_leaves():
         "query": query,
     }
     response = requests.get(url, headers=get_auth_header(), params=params)
-    response.raise_for_status()
+    if not response.ok:
+        print("kintone error:", response.status_code, response.text)
+        response.raise_for_status()
     return response.json()["records"]
 
 
