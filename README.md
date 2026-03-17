@@ -1,0 +1,1 @@
+# -kintone-attendance-notify
