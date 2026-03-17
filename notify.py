@@ -1,24 +1,19 @@
-  import requests
+ import requests
   import base64
   import os
   from datetime import datetime, timezone, timedelta
 
-  # kintoneの設定
   KINTONE_SUBDOMAIN = "iu9b8ymlk83t"
   LEAVE_APP_ID = 79
 
-  # GitHubのSecretsから読み込む（パスワードなどを安全に管理する仕組み）
   KINTONE_USERNAME = os.environ["KINTONE_USERNAME"]
   KINTONE_PASSWORD = os.environ["KINTONE_PASSWORD"]
   TEAMS_WEBHOOK_URL = os.environ["TEAMS_WEBHOOK_URL"]
 
-  # 日本時間（UTC+9）
   JST = timezone(timedelta(hours=9))
 
 
   def get_auth_header():
-      """kintoneにアクセスするための認証情報を作る"""
-      # ユーザー名:パスワード をBase64という形式に変換する（kintoneのルール）
       credentials = base64.b64encode(
           f"{KINTONE_USERNAME}:{KINTONE_PASSWORD}".encode()
       ).decode()
@@ -29,74 +24,57 @@
 
 
   def get_today_leaves():
-      """今日の承認済み休暇一覧をkintoneから取得する"""
       today = datetime.now(JST)
       today_start = today.strftime("%Y-%m-%dT00:00:00+09:00")
       today_end = today.strftime("%Y-%m-%dT23:59:59+09:00")
-
-      # kintoneの検索条件：承認済み かつ 今日がFrom〜Toの範囲内
       query = f'ステータス in ("承認済") and From <= "{today_end}" and To >= "{today_start}"'
-
       url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
       params = {
           "app": LEAVE_APP_ID,
           "query": query,
       }
-
       response = requests.get(url, headers=get_auth_header(), params=params)
       response.raise_for_status()
       return response.json()["records"]
 
 
   def get_leave_label(record):
-      """時間帯から終日・午前半休・午後半休を判定する"""
       leave_type = record.get("休暇種別", {}).get("value", "")
       from_str = record.get("From", {}).get("value", "")
       to_str = record.get("To", {}).get("value", "")
-
       time_label = "休暇"
       if from_str and to_str:
           from_dt = datetime.fromisoformat(from_str)
           to_dt = datetime.fromisoformat(to_str)
-
           if from_dt.hour <= 9 and to_dt.hour >= 17:
               time_label = "終日"
           elif to_dt.hour <= 13:
               time_label = "午前半休"
           elif from_dt.hour >= 13:
               time_label = "午後半休"
-
       if leave_type:
           return f"{leave_type}（{time_label}）"
       return time_label
 
 
   def send_teams_notification(records):
-      """Teamsに通知を送る"""
       today = datetime.now(JST)
       today_str = today.strftime("%m/%d").lstrip("0")
-
       if not records:
           print("本日の休暇申請はありません。通知をスキップします。")
           return
-
       lines = []
       for record in records:
-          # 担当者フィールドから名前を取得
           tantousha = record.get("担当者", {}).get("value", [])
           if isinstance(tantousha, list) and tantousha:
               name = tantousha[0].get("name", "不明")
           else:
               name = str(tantousha) if tantousha else "不明"
-
           dept = record.get("所属", {}).get("value", "")
           label = get_leave_label(record)
-
           lines.append(f"・{name}（{dept}）　{label}")
-
       body_text = "\n".join(lines)
       total = len(records)
-
       message_text = (
           f"📅 今日（{today_str}）のお休み\n"
           f"━━━━━━━━━━━━━━\n"
@@ -104,8 +82,6 @@
           f"━━━━━━━━━━━━━━\n"
           f"合計 {total}名"
       )
-
-      # Teamsへ送るデータの形式（Adaptive Cardという形式）
       payload = {
           "type": "message",
           "attachments": [
@@ -127,7 +103,6 @@
               }
           ],
       }
-
       response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
       response.raise_for_status()
       print(f"通知送信完了：{total}名分")
