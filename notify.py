@@ -140,9 +140,36 @@ def get_leave_label(record):
     return leave_type or unit or "休暇"
 
 
+# ── 今月の休暇予定を取得する関数 ──────────────────────────────
+
+def get_monthly_leaves():
+    """今日以降〜月末のPSG社員の承認済み休暇を取得する"""
+    import calendar
+    today = datetime.now(JST)
+    today_str = today.strftime("%Y-%m-%d")
+    # 月末日を計算する
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    end_str = today.strftime(f"%Y-%m-{last_day:02d}")
+
+    query = (
+        f'当該日時From >= "{today_str}T00:00:00+09:00"'
+        f' and 当該日時From <= "{end_str}T23:59:59+09:00"'
+        f' and 所属部署 in ("PSG")'
+        f' and ステータス = "届出「承認済」"'
+        f' order by 当該日時From asc'
+    )
+    url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
+    params = {"app": LEAVE_APP_ID, "query": query}
+    response = requests.get(url, headers=get_leave_header(), params=params)
+    if not response.ok:
+        print("kintone error:", response.status_code, response.text)
+        response.raise_for_status()
+    return response.json()["records"]
+
+
 # ── Teamsに当番＋お休みをまとめて送る関数 ────────────────────
 
-def send_teams_notification(main_name, sub_name, target_date, members, records):
+def send_teams_notification(main_name, sub_name, target_date, members, records, monthly_records):
     """当番とお休み情報を1つにまとめてTeamsに投稿する"""
     today = datetime.now(JST)
     today_dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
@@ -176,6 +203,26 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
         holiday_body = "\n".join(lines)
         total = len(records)
         footer = f"合計 **{total}名**"
+
+    # 今月の休暇予定パート
+    dow_list = ["月", "火", "水", "木", "金", "土", "日"]
+    if not monthly_records:
+        monthly_text = "今月の予定はありません"
+    else:
+        monthly_lines = []
+        for record in monthly_records:
+            shaiin = record.get("社員", {}).get("value", [])
+            name = shaiin[0].get("name", "不明") if shaiin else "不明"
+            label = get_leave_label(record)
+            from_str = record.get("当該日時From", {}).get("value", "")
+            if from_str:
+                # UTCで保存されているのでJSTに変換して日付を取得
+                dt = datetime.fromisoformat(from_str.replace("Z", "+00:00")).astimezone(JST)
+                d_str = f"{dt.month}/{dt.day}（{dow_list[dt.weekday()]}）"
+            else:
+                d_str = "日付不明"
+            monthly_lines.append(f"{d_str}　{name}　{label}")
+        monthly_text = "\n".join(monthly_lines)
 
     # お休みがいる場合はwarning（黄）、いない場合はgood（緑）の背景
     holiday_style = "good" if not records else "warning"  # なし=緑、あり=黄
@@ -231,7 +278,7 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
                                 },
                             ],
                         },
-                        # お休みセクション（緑 or 黄の背景）
+                        # 今日のお休みセクション（緑 or 黄の背景）
                         {
                             "type": "Container",
                             "style": holiday_style,
@@ -254,6 +301,25 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
                                     "wrap": True,
                                     "spacing": "Small",
                                     "isSubtle": True,
+                                },
+                            ],
+                        },
+                        # 今月の休暇予定セクション（emphasis = グレー）
+                        {
+                            "type": "Container",
+                            "style": "emphasis",
+                            "spacing": "Medium",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "📆 今月の休暇予定",
+                                    "wrap": True,
+                                    "weight": "Bolder",
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": monthly_text,
+                                    "wrap": True,
                                 },
                             ],
                         },
@@ -280,4 +346,5 @@ if __name__ == "__main__":
         members = get_psg_members()
         main_name, sub_name, target_date = get_duty_pair(members)
         records = get_today_leaves()
-        send_teams_notification(main_name, sub_name, target_date, members, records)
+        monthly_records = get_monthly_leaves()
+        send_teams_notification(main_name, sub_name, target_date, members, records, monthly_records)
