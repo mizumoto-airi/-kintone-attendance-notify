@@ -186,12 +186,13 @@ def send_teams_notification(records):
             lines.append(f"・{name}　{label}")
         body_text = "\n".join(lines)
         total = len(records)
+    footer = f"合計 {total}名" if total > 0 else "全員出席です！"
     message_text = (
         f"📅 今日（{today_str}）のお休み\n"
         f"━━━━━━━━━━━━━━\n"
         f"{body_text}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"合計 {total}名" if total > 0 else "全員出席です！"
+        f"{footer}"
     )
     payload = {
         "type": "message",
