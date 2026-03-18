@@ -2,9 +2,8 @@ name: notify
 
 on:
   schedule:
-    - cron: '0 23 * * 0-4'   # 本番：平日 JST 8:00
-    - cron: '40 6 18 3 *'    # テスト用：3/18 JST 15:40（確認後に削除する）
-  workflow_dispatch:
+    - cron: '0 0 * * 1-5'  # 平日 JST 9:00（UTC 0:00）に自動実行
+  workflow_dispatch:        # GitHubの画面から手動実行もできる
 
 jobs:
   notify:
@@ -17,7 +16,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: install requests
-        run: pip install requests
+        run: pip install requests jpholiday
       - name: run script
         env:
           KINTONE_LEAVE_APP_TOKEN: ${{ secrets.KINTONE_LEAVE_APP_TOKEN }}

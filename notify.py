@@ -1,5 +1,6 @@
 import requests
 import os
+import jpholiday
 from datetime import datetime, date, timezone, timedelta
 
 # ── kintoneの設定 ──────────────────────────────────────────
@@ -82,19 +83,19 @@ def get_psg_members():
 # ── 今日の当番を計算する関数 ──────────────────────────────────
 
 def count_weekdays(start, end):
-    """start から end の前日まで（end当日は含まない）の平日数を数える"""
+    """start から end の前日まで（end当日は含まない）の営業日数を数える（祝日除く）"""
     count = 0
     current = start
     while current < end:
-        if current.weekday() < 5:  # 月曜=0〜金曜=4 が平日
+        if current.weekday() < 5 and not jpholiday.is_holiday(current):
             count += 1
         current += timedelta(days=1)
     return count
 
 def get_next_weekday(d):
-    """dの翌平日を返す（土曜→月曜、日曜→月曜）"""
+    """dの翌営業日を返す（土日祝を飛ばす）"""
     next_day = d + timedelta(days=1)
-    while next_day.weekday() >= 5:  # 5=土曜、6=日曜
+    while next_day.weekday() >= 5 or jpholiday.is_holiday(next_day):
         next_day += timedelta(days=1)
     return next_day
 
@@ -269,9 +270,14 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
 
 # ── メイン処理 ────────────────────────────────────────────────
 if __name__ == "__main__":
-    check_api_connection()
+    today = datetime.now(JST).date()
 
-    members = get_psg_members()
-    main_name, sub_name, target_date = get_duty_pair(members)
-    records = get_today_leaves()
-    send_teams_notification(main_name, sub_name, target_date, members, records)
+    # 今日が祝日なら通知しない
+    if jpholiday.is_holiday(today):
+        print(f"今日（{today}）は祝日のため通知をスキップします。")
+    else:
+        check_api_connection()
+        members = get_psg_members()
+        main_name, sub_name, target_date = get_duty_pair(members)
+        records = get_today_leaves()
+        send_teams_notification(main_name, sub_name, target_date, members, records)
