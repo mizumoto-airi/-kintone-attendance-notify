@@ -1,21 +1,16 @@
-"""
-取得結果の確認用スクリプト（Teamsには送信しない）
-notify.py の get_today_leaves() と get_leave_label() を使って
-実際に取得されるデータをログに表示する
-"""
-import os
-from notify import get_today_leaves, get_leave_label
-from datetime import datetime, timezone, timedelta
+"""M社員アプリのフィールド構造を確認する"""
+import requests
 
-JST = timezone(timedelta(hours=9))
+SUBDOMAIN = "iu9b8ymlk83t"
+TOKEN_7 = "bETQhdZ7JEi23CJnE1T6shggtbHAC1N3j5KC2VHT"
 
-records = get_today_leaves()
-today_str = datetime.now(JST).strftime("%m/%d").lstrip("0")
+url = f"https://{SUBDOMAIN}.cybozu.com/k/v1/records.json"
+res = requests.get(url, headers={"X-Cybozu-API-Token": TOKEN_7}, params={"app": 7})
+records = res.json()["records"]
 
-print(f"=== {today_str} の休暇申請（{len(records)}件） ===")
+print("=== M社員アプリ 1件目のフィールド一覧 ===")
+first = records[0]
+for key, val in first.items():
+    print(f"フィールド名: {key!r:30s} 型: {val.get('type','')!r:25s} 値: {val.get('value')}")
 
-for record in records:
-    shaiin = record.get("社員", {}).get("value", [])
-    name = shaiin[0].get("name", "不明") if shaiin else "不明"
-    label = get_leave_label(record)
-    print(f"・{name}　{label}")
+print(f"\n合計 {len(records)} 件")
