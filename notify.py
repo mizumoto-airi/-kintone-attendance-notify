@@ -22,17 +22,11 @@ JST = timezone(timedelta(hours=9))
 
 def get_leave_header():
     """届出アプリ（ID:79）用のヘッダー"""
-    return {
-        "X-Cybozu-API-Token": KINTONE_LEAVE_APP_TOKEN,
-        "Content-Type": "application/json",
-    }
+    return {"X-Cybozu-API-Token": KINTONE_LEAVE_APP_TOKEN}
 
 def get_member_header():
     """M社員アプリ（ID:7）用のヘッダー"""
-    return {
-        "X-Cybozu-API-Token": KINTONE_MEMBER_APP_TOKEN,
-        "Content-Type": "application/json",
-    }
+    return {"X-Cybozu-API-Token": KINTONE_MEMBER_APP_TOKEN}
 
 
 # ── API接続確認用の関数 ───────────────────────────────────────
