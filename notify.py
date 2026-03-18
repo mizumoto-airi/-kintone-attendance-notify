@@ -134,22 +134,21 @@ def get_leave_label(record):
 # ── Teamsに当番＋お休みをまとめて送る関数 ────────────────────
 
 def send_teams_notification(main_name, sub_name, records):
-    """当番とお休み情報を1つにまとめてTeamsに投稿する"""
+    """当番とお休み情報を1つにまとめてTeamsに投稿する（ちょっと可愛く整形）"""
     today = datetime.now(JST)
     dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
     today_str = f"{today.month}/{today.day}（{dow}）"
 
-    # 当番パート
-    duty_text = (
-        f"{today_str}の朝会、スマビジ当番よろしくお願い致します。\n"
-        f"メイン：{main_name}さん\n"
-        f"サブ：{sub_name}さん"
-    )
+    # 当番パート（タイトルを少し可愛く）
+    duty_title = f"☀️ {today_str} の朝会スマビジ当番"
+    duty_main = f"メイン：**{main_name} さん**"
+    duty_sub = f"サブ：**{sub_name} さん**"
 
     # お休みパート
+    holiday_title = "📅 今日のお休み"
     if not records:
-        body_text = "お休みの方はいません"
-        total = 0
+        holiday_body = "お休みの方はいません"
+        footer = "🎉 **全員出席です！**"
     else:
         lines = []
         for record in records:
@@ -157,18 +156,13 @@ def send_teams_notification(main_name, sub_name, records):
             name = shaiin[0].get("name", "不明") if shaiin else "不明"
             label = get_leave_label(record)
             lines.append(f"・{name}　{label}")
-        body_text = "\n".join(lines)
+        holiday_body = "\n".join(lines)
         total = len(records)
-    footer = f"合計 {total}名" if total > 0 else "全員出席です！"
+        footer = f"合計 **{total}名**"
 
-    message_text = (
-        f"{duty_text}\n\n"
-        f"📅 今日（{today_str}）のお休み\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"{body_text}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"{footer}"
-    )
+    # お休みがいる場合はwarning（黄）、いない場合はgood（緑）の背景
+    holiday_style = "good" if not records else "warning"
+
     payload = {
         "type": "message",
         "attachments": [
@@ -179,12 +173,54 @@ def send_teams_notification(main_name, sub_name, records):
                     "type": "AdaptiveCard",
                     "version": "1.2",
                     "body": [
+                        # 当番セクション（accent = 青紫系の背景）
                         {
-                            "type": "TextBlock",
-                            "text": message_text,
-                            "wrap": True,
-                            "fontType": "Monospace",
-                        }
+                            "type": "Container",
+                            "style": "accent",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": duty_title,
+                                    "wrap": True,
+                                    "weight": "Bolder",
+                                    "size": "Medium",
+                                    "color": "Light",
+                                },
+                                {
+                                    "type": "FactSet",
+                                    "facts": [
+                                        {"title": "メイン", "value": f"{main_name} さん"},
+                                        {"title": "サブ　", "value": f"{sub_name} さん"},
+                                    ],
+                                },
+                            ],
+                        },
+                        # お休みセクション（緑 or 黄の背景）
+                        {
+                            "type": "Container",
+                            "style": holiday_style,
+                            "spacing": "Medium",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": holiday_title,
+                                    "wrap": True,
+                                    "weight": "Bolder",
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": holiday_body,
+                                    "wrap": True,
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": footer,
+                                    "wrap": True,
+                                    "spacing": "Small",
+                                    "isSubtle": True,
+                                },
+                            ],
+                        },
                     ],
                 },
             }
