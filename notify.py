@@ -1,58 +1,139 @@
 import requests
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta
 
 # ── kintoneの設定 ──────────────────────────────────────────
-KINTONE_SUBDOMAIN = "iu9b8ymlk83t"  # あなたのkintoneのサブドメイン
+KINTONE_SUBDOMAIN = "iu9b8ymlk83t"
 LEAVE_APP_ID = 79   # 届出アプリ
 MEMBER_APP_ID = 7   # M社員アプリ
 
-# 環境変数からAPIトークンを取得する
-# （GitHubのSecretsに登録する。コードに直接書いてはいけない！）
-KINTONE_LEAVE_APP_TOKEN = os.environ["KINTONE_LEAVE_APP_TOKEN"]    # 届出アプリ用トークン
-KINTONE_MEMBER_APP_TOKEN = os.environ["KINTONE_MEMBER_APP_TOKEN"]  # M社員アプリ用トークン
+KINTONE_LEAVE_APP_TOKEN = os.environ["KINTONE_LEAVE_APP_TOKEN"]
+KINTONE_MEMBER_APP_TOKEN = os.environ["KINTONE_MEMBER_APP_TOKEN"]
 TEAMS_WEBHOOK_URL = os.environ["TEAMS_WEBHOOK_URL"]
 
 # ── 日本時間の設定 ──────────────────────────────────────────
 JST = timezone(timedelta(hours=9))
 
+# ── 当番ローテーションの基準日 ────────────────────────────────
+# 3/17（火）のメインは 表示順で6番目の谷口さん（0始まりで index=5）
+DUTY_BASE_DATE = date(2026, 3, 17)
+DUTY_BASE_INDEX = 5  # 谷口さんが 0始まりで何番目か
+
 
 # ── 認証ヘッダーを作る関数 ────────────────────────────────────
-# 「ヘッダー」= APIリクエストに付ける付加情報。「このトークンを持つ人だよ」とkintoneに証明する
 
 def get_leave_header():
-    """届出アプリ（ID:79）用のヘッダー"""
     return {"X-Cybozu-API-Token": KINTONE_LEAVE_APP_TOKEN}
 
 def get_member_header():
-    """M社員アプリ（ID:7）用のヘッダー"""
     return {"X-Cybozu-API-Token": KINTONE_MEMBER_APP_TOKEN}
 
 
 # ── API接続確認用の関数 ───────────────────────────────────────
 
 def check_api_connection():
-    """両アプリにつながるか確認する。成功したら件数を表示する"""
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     print("=== kintone API接続確認 ===")
 
-    # 届出アプリ（ID:79）
     print(f"\n[1] 届出アプリ（ID:{LEAVE_APP_ID}）を確認中...")
-    res = requests.get(url, headers=get_leave_header(), params={"app": LEAVE_APP_ID, "totalCount": True})
+    res = requests.get(url, headers=get_leave_header(), params={"app": LEAVE_APP_ID})
     if res.ok:
-        print(f"    接続成功！ 総レコード数: {res.json().get('totalCount', '?')}件")
+        print(f"    接続成功！")
     else:
         print(f"    接続失敗！ エラー: {res.status_code} / {res.text}")
 
-    # M社員アプリ（ID:7）
     print(f"\n[2] M社員アプリ（ID:{MEMBER_APP_ID}）を確認中...")
-    res = requests.get(url, headers=get_member_header(), params={"app": MEMBER_APP_ID, "totalCount": True})
+    res = requests.get(url, headers=get_member_header(), params={"app": MEMBER_APP_ID})
     if res.ok:
-        print(f"    接続成功！ 総レコード数: {res.json().get('totalCount', '?')}件")
+        print(f"    接続成功！")
     else:
         print(f"    接続失敗！ エラー: {res.status_code} / {res.text}")
 
     print("\n=== 確認完了 ===")
+
+
+# ── PSG社員一覧を取得する関数 ────────────────────────────────
+
+def get_psg_members():
+    """M社員アプリからPSGの社員を表示順で取得し、名前のリストを返す"""
+    url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
+    params = {
+        "app": MEMBER_APP_ID,
+        "query": '部署 in ("PSG") order by 表示順 asc',
+    }
+    response = requests.get(url, headers=get_member_header(), params=params)
+    if not response.ok:
+        print("kintone error:", response.status_code, response.text)
+        response.raise_for_status()
+
+    members = []
+    for record in response.json()["records"]:
+        shaiin = record.get("社員名", {}).get("value", [])
+        if shaiin:
+            members.append(shaiin[0].get("name", "不明"))
+    return members
+
+
+# ── 今日の当番を計算する関数 ──────────────────────────────────
+
+def count_weekdays(start, end):
+    """start から end の前日まで（end当日は含まない）の平日数を数える"""
+    count = 0
+    current = start
+    while current < end:
+        if current.weekday() < 5:  # 月曜=0〜金曜=4 が平日
+            count += 1
+        current += timedelta(days=1)
+    return count
+
+def get_duty_pair(members):
+    """今日のメインとサブの名前を返す"""
+    today = datetime.now(JST).date()
+    # 基準日から今日まで何平日経過したか
+    elapsed = count_weekdays(DUTY_BASE_DATE, today)
+    n = len(members)
+    main_idx = (DUTY_BASE_INDEX + elapsed) % n
+    sub_idx = (main_idx + 1) % n
+    return members[main_idx], members[sub_idx]
+
+
+# ── Teamsに当番通知を送る関数 ─────────────────────────────────
+
+def send_duty_notification(main_name, sub_name):
+    """当番をTeamsに投稿する"""
+    today = datetime.now(JST)
+    dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
+    today_str = f"{today.month}/{today.day}（{dow}）"
+
+    message_text = (
+        f"{today_str}の朝会、スマビジ当番よろしくお願い致します。\n\n"
+        f"メイン：{main_name}さん\n"
+        f"サブ：{sub_name}さん"
+    )
+    payload = {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.2",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "text": message_text,
+                            "wrap": True,
+                            "fontType": "Monospace",
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
+    response.raise_for_status()
+    print(f"当番通知送信完了：メイン={main_name}、サブ={sub_name}")
 
 
 # ── 今日の休暇申請を取得する関数 ──────────────────────────────
@@ -60,17 +141,13 @@ def check_api_connection():
 def get_today_leaves():
     """届出アプリから今日のPSG社員の休暇申請レコードを取得する"""
     today_str = datetime.now(JST).strftime("%Y-%m-%d")
-    # 今日の日付 かつ PSG部署の人だけに絞る
     query = (
         f'当該日時From >= "{today_str}T00:00:00+09:00"'
         f' and 当該日時From <= "{today_str}T23:59:59+09:00"'
         f' and 所属部署 in ("PSG")'
     )
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
-    params = {
-        "app": LEAVE_APP_ID,
-        "query": query,
-    }
+    params = {"app": LEAVE_APP_ID, "query": query}
     response = requests.get(url, headers=get_leave_header(), params=params)
     if not response.ok:
         print("kintone error:", response.status_code, response.text)
@@ -79,15 +156,14 @@ def get_today_leaves():
 
 
 def get_leave_label(record):
-    """休暇の種別ラベルを返す（例：有給（終日）、有給（午前）など）"""
     leave_type = record.get("休暇種別", {}).get("value", "") or ""
-    unit = record.get("休暇単位", {}).get("value", "") or ""  # 「終日」「午前」「午後」が入っている
+    unit = record.get("休暇単位", {}).get("value", "") or ""
     if leave_type and unit:
         return f"{leave_type}（{unit}）"
     return leave_type or unit or "休暇"
 
 
-# ── Teamsに通知を送る関数 ──────────────────────────────────────
+# ── Teamsにお休み通知を送る関数 ───────────────────────────────
 
 def send_teams_notification(records):
     """取得した休暇レコードをTeamsに投稿する"""
@@ -99,7 +175,6 @@ def send_teams_notification(records):
     else:
         lines = []
         for record in records:
-            # 「社員」フィールドから名前を取得（USER_SELECT型 = リスト形式）
             shaiin = record.get("社員", {}).get("value", [])
             name = shaiin[0].get("name", "不明") if shaiin else "不明"
             label = get_leave_label(record)
@@ -136,11 +211,18 @@ def send_teams_notification(records):
     }
     response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
     response.raise_for_status()
-    print(f"通知送信完了：{total}名分")
+    print(f"お休み通知送信完了：{total}名分")
 
 
 # ── メイン処理 ────────────────────────────────────────────────
 if __name__ == "__main__":
     check_api_connection()
+
+    # 当番通知
+    members = get_psg_members()
+    main_name, sub_name = get_duty_pair(members)
+    send_duty_notification(main_name, sub_name)
+
+    # お休み通知
     records = get_today_leaves()
     send_teams_notification(records)
