@@ -17,7 +17,5 @@ print(f"=== {today_str} の休暇申請（{len(records)}件） ===")
 for record in records:
     shaiin = record.get("社員", {}).get("value", [])
     name = shaiin[0].get("name", "不明") if shaiin else "不明"
-    dept_list = record.get("所属部署", {}).get("value", [])
-    dept = dept_list[0].get("name", "") if dept_list else ""
     label = get_leave_label(record)
-    print(f"・{name}（{dept}）　{label}")
+    print(f"・{name}　{label}")

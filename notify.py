@@ -58,10 +58,14 @@ def check_api_connection():
 # ── 今日の休暇申請を取得する関数 ──────────────────────────────
 
 def get_today_leaves():
-    """届出アプリから今日の休暇申請レコードを取得する"""
+    """届出アプリから今日のPSG社員の休暇申請レコードを取得する"""
     today_str = datetime.now(JST).strftime("%Y-%m-%d")
-    # kintoneのクエリで「当該日時From」が今日のレコードだけに絞る
-    query = f'当該日時From >= "{today_str}T00:00:00+09:00" and 当該日時From <= "{today_str}T23:59:59+09:00"'
+    # 今日の日付 かつ PSG部署の人だけに絞る
+    query = (
+        f'当該日時From >= "{today_str}T00:00:00+09:00"'
+        f' and 当該日時From <= "{today_str}T23:59:59+09:00"'
+        f' and 所属部署 in ("PSG")'
+    )
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     params = {
         "app": LEAVE_APP_ID,
@@ -97,11 +101,8 @@ def send_teams_notification(records):
         # 「社員」フィールドから名前を取得（USER_SELECT型 = リスト形式）
         shaiin = record.get("社員", {}).get("value", [])
         name = shaiin[0].get("name", "不明") if shaiin else "不明"
-        # 「所属部署」フィールドから部署名を取得（ORGANIZATION_SELECT型 = リスト形式）
-        dept_list = record.get("所属部署", {}).get("value", [])
-        dept = dept_list[0].get("name", "") if dept_list else ""
         label = get_leave_label(record)
-        lines.append(f"・{name}（{dept}）　{label}")
+        lines.append(f"・{name}　{label}")
     body_text = "\n".join(lines)
     total = len(records)
     message_text = (
