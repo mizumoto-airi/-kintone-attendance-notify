@@ -59,7 +59,7 @@ def get_psg_members():
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     params = {
         "app": MEMBER_APP_ID,
-        "query": '部署 in ("PSG") order by 表示順 asc',
+        "query": '部署 in ("PSG") order by レコード番号 asc',
     }
     response = requests.get(url, headers=get_member_header(), params=params)
     if not response.ok:
