@@ -177,7 +177,7 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
         footer = f"合計 **{total}名**"
 
     # お休みがいる場合はwarning（黄）、いない場合はgood（緑）の背景
-    holiday_style = "good" if not records else "warning"
+    holiday_style = "good" if not records else "warning"  # なし=緑、あり=黄
 
     payload = {
         "type": "message",
@@ -189,10 +189,10 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
                     "type": "AdaptiveCard",
                     "version": "1.2",
                     "body": [
-                        # 当番セクション（accent = 青紫系の背景）
+                        # 当番セクション（attention = 赤ピンク）
                         {
                             "type": "Container",
-                            "style": "accent",
+                            "style": "attention",
                             "items": [
                                 {
                                     "type": "TextBlock",
@@ -200,7 +200,6 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
                                     "wrap": True,
                                     "weight": "Bolder",
                                     "size": "Medium",
-                                    "color": "Light",
                                 },
                                 {
                                     "type": "FactSet",
@@ -211,10 +210,10 @@ def send_teams_notification(main_name, sub_name, target_date, members, records):
                                 },
                             ],
                         },
-                        # 当番一覧セクション（emphasis = グレー系の背景）
+                        # 当番一覧セクション（accent = 青紫）
                         {
                             "type": "Container",
-                            "style": "emphasis",
+                            "style": "accent",
                             "spacing": "Small",
                             "items": [
                                 {
