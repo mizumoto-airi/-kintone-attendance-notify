@@ -102,43 +102,6 @@ def get_duty_pair(members):
     return members[main_idx], members[sub_idx]
 
 
-# ── Teamsに当番通知を送る関数 ─────────────────────────────────
-
-def send_duty_notification(main_name, sub_name):
-    """当番をTeamsに投稿する"""
-    today = datetime.now(JST)
-    dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
-    today_str = f"{today.month}/{today.day}（{dow}）"
-
-    message_text = (
-        f"{today_str}の朝会、スマビジ当番よろしくお願い致します。\n\n"
-        f"メイン：{main_name}さん\n"
-        f"サブ：{sub_name}さん"
-    )
-    payload = {
-        "type": "message",
-        "attachments": [
-            {
-                "contentType": "application/vnd.microsoft.card.adaptive",
-                "content": {
-                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                    "type": "AdaptiveCard",
-                    "version": "1.2",
-                    "body": [
-                        {
-                            "type": "TextBlock",
-                            "text": message_text,
-                            "wrap": True,
-                            "fontType": "Monospace",
-                        }
-                    ],
-                },
-            }
-        ],
-    }
-    response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
-    response.raise_for_status()
-    print(f"当番通知送信完了：メイン={main_name}、サブ={sub_name}")
 
 
 # ── 今日の休暇申請を取得する関数 ──────────────────────────────
@@ -168,12 +131,22 @@ def get_leave_label(record):
     return leave_type or unit or "休暇"
 
 
-# ── Teamsにお休み通知を送る関数 ───────────────────────────────
+# ── Teamsに当番＋お休みをまとめて送る関数 ────────────────────
 
-def send_teams_notification(records):
-    """取得した休暇レコードをTeamsに投稿する"""
+def send_teams_notification(main_name, sub_name, records):
+    """当番とお休み情報を1つにまとめてTeamsに投稿する"""
     today = datetime.now(JST)
-    today_str = today.strftime("%m/%d").lstrip("0")
+    dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
+    today_str = f"{today.month}/{today.day}（{dow}）"
+
+    # 当番パート
+    duty_text = (
+        f"{today_str}の朝会、スマビジ当番よろしくお願い致します。\n"
+        f"メイン：{main_name}さん\n"
+        f"サブ：{sub_name}さん"
+    )
+
+    # お休みパート
     if not records:
         body_text = "お休みの方はいません"
         total = 0
@@ -187,7 +160,9 @@ def send_teams_notification(records):
         body_text = "\n".join(lines)
         total = len(records)
     footer = f"合計 {total}名" if total > 0 else "全員出席です！"
+
     message_text = (
+        f"{duty_text}\n\n"
         f"📅 今日（{today_str}）のお休み\n"
         f"━━━━━━━━━━━━━━\n"
         f"{body_text}\n"
@@ -217,18 +192,14 @@ def send_teams_notification(records):
     }
     response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
     response.raise_for_status()
-    print(f"お休み通知送信完了：{total}名分")
+    print(f"通知送信完了：メイン={main_name}、サブ={sub_name}、お休み={total}名")
 
 
 # ── メイン処理 ────────────────────────────────────────────────
 if __name__ == "__main__":
     check_api_connection()
 
-    # 当番通知
     members = get_psg_members()
     main_name, sub_name = get_duty_pair(members)
-    send_duty_notification(main_name, sub_name)
-
-    # お休み通知
     records = get_today_leaves()
-    send_teams_notification(records)
+    send_teams_notification(main_name, sub_name, records)
