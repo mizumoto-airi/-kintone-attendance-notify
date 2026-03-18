@@ -91,15 +91,23 @@ def count_weekdays(start, end):
         current += timedelta(days=1)
     return count
 
+def get_next_weekday(d):
+    """dの翌平日を返す（土曜→月曜、日曜→月曜）"""
+    next_day = d + timedelta(days=1)
+    while next_day.weekday() >= 5:  # 5=土曜、6=日曜
+        next_day += timedelta(days=1)
+    return next_day
+
 def get_duty_pair(members):
-    """今日のメインとサブの名前を返す"""
+    """明日（次の平日）のメインとサブの名前と日付を返す"""
     today = datetime.now(JST).date()
-    # 基準日から今日まで何平日経過したか
-    elapsed = count_weekdays(DUTY_BASE_DATE, today)
+    target = get_next_weekday(today)  # 明日 or 翌月曜
+    # 基準日からtargetまで何平日経過したか
+    elapsed = count_weekdays(DUTY_BASE_DATE, target)
     n = len(members)
     main_idx = (DUTY_BASE_INDEX + elapsed) % n
     sub_idx = (main_idx + 1) % n
-    return members[main_idx], members[sub_idx]
+    return members[main_idx], members[sub_idx], target
 
 
 
@@ -133,16 +141,24 @@ def get_leave_label(record):
 
 # ── Teamsに当番＋お休みをまとめて送る関数 ────────────────────
 
-def send_teams_notification(main_name, sub_name, records):
-    """当番とお休み情報を1つにまとめてTeamsに投稿する（ちょっと可愛く整形）"""
+def send_teams_notification(main_name, sub_name, target_date, members, records):
+    """当番とお休み情報を1つにまとめてTeamsに投稿する"""
     today = datetime.now(JST)
-    dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
-    today_str = f"{today.month}/{today.day}（{dow}）"
+    today_dow = ["月", "火", "水", "木", "金", "土", "日"][today.weekday()]
+    today_str = f"{today.month}/{today.day}（{today_dow}）"
 
-    # 当番パート（タイトルを少し可愛く）
-    duty_title = f"☀️ {today_str} の朝会スマビジ当番"
-    duty_main = f"メイン：**{main_name} さん**"
-    duty_sub = f"サブ：**{sub_name} さん**"
+    # 明日（次の平日）の日付表示
+    target_dow = ["月", "火", "水", "木", "金", "土", "日"][target_date.weekday()]
+    target_str = f"{target_date.month}/{target_date.day}（{target_dow}）"
+
+    # 当番パート：明日の当番
+    duty_title = f"☀️ {target_str} の朝会スマビジ当番"
+
+    # 当番一覧（全メンバーをリスト表示）
+    roster_lines = []
+    for i, name in enumerate(members):
+        roster_lines.append(f"{i + 1}. {name}")
+    roster_text = "\n".join(roster_lines)
 
     # お休みパート
     holiday_title = "📅 今日のお休み"
@@ -195,6 +211,26 @@ def send_teams_notification(main_name, sub_name, records):
                                 },
                             ],
                         },
+                        # 当番一覧セクション（emphasis = グレー系の背景）
+                        {
+                            "type": "Container",
+                            "style": "emphasis",
+                            "spacing": "Small",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "📋 当番一覧",
+                                    "wrap": True,
+                                    "weight": "Bolder",
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": roster_text,
+                                    "wrap": True,
+                                    "isSubtle": True,
+                                },
+                            ],
+                        },
                         # お休みセクション（緑 or 黄の背景）
                         {
                             "type": "Container",
@@ -228,6 +264,7 @@ def send_teams_notification(main_name, sub_name, records):
     }
     response = requests.post(TEAMS_WEBHOOK_URL, json=payload)
     response.raise_for_status()
+    total = len(records)
     print(f"通知送信完了：メイン={main_name}、サブ={sub_name}、お休み={total}名")
 
 
@@ -236,6 +273,6 @@ if __name__ == "__main__":
     check_api_connection()
 
     members = get_psg_members()
-    main_name, sub_name = get_duty_pair(members)
+    main_name, sub_name, target_date = get_duty_pair(members)
     records = get_today_leaves()
-    send_teams_notification(main_name, sub_name, records)
+    send_teams_notification(main_name, sub_name, target_date, members, records)
