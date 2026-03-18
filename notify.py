@@ -133,11 +133,17 @@ def get_today_leaves():
 
 
 def get_leave_label(record):
+    shukkatsu = record.get("届出種別", {}).get("value", "") or ""
     leave_type = record.get("休暇種別", {}).get("value", "") or ""
     unit = record.get("休暇単位", {}).get("value", "") or ""
+
+    # 休出（休日出勤）はそのまま「休出」と表示
+    if shukkatsu == "休出":
+        return "休出"
+    # 休暇の場合は休暇種別（有給・振替・欠勤など）＋単位（終日・午前・午後）
     if leave_type and unit:
         return f"{leave_type}（{unit}）"
-    return leave_type or unit or "休暇"
+    return leave_type or unit or shukkatsu or "休暇"
 
 
 # ── 今月の休暇予定を取得する関数 ──────────────────────────────
