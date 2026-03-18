@@ -66,11 +66,16 @@ def get_psg_members():
         print("kintone error:", response.status_code, response.text)
         response.raise_for_status()
 
+    # 当番対象外の人を除外する
+    EXCLUDE_NAMES = ["甲野 二号", "甲野 光邦"]
+
     members = []
     for record in response.json()["records"]:
         shaiin = record.get("社員名", {}).get("value", [])
         if shaiin:
-            members.append(shaiin[0].get("name", "不明"))
+            name = shaiin[0].get("name", "不明")
+            if name not in EXCLUDE_NAMES:
+                members.append(name)
     return members
 
 
