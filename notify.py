@@ -94,23 +94,24 @@ def send_teams_notification(records):
     today = datetime.now(JST)
     today_str = today.strftime("%m/%d").lstrip("0")
     if not records:
-        print("本日の休暇申請はありません。通知をスキップします。")
-        return
-    lines = []
-    for record in records:
-        # 「社員」フィールドから名前を取得（USER_SELECT型 = リスト形式）
-        shaiin = record.get("社員", {}).get("value", [])
-        name = shaiin[0].get("name", "不明") if shaiin else "不明"
-        label = get_leave_label(record)
-        lines.append(f"・{name}　{label}")
-    body_text = "\n".join(lines)
-    total = len(records)
+        body_text = "お休みの方はいません"
+        total = 0
+    else:
+        lines = []
+        for record in records:
+            # 「社員」フィールドから名前を取得（USER_SELECT型 = リスト形式）
+            shaiin = record.get("社員", {}).get("value", [])
+            name = shaiin[0].get("name", "不明") if shaiin else "不明"
+            label = get_leave_label(record)
+            lines.append(f"・{name}　{label}")
+        body_text = "\n".join(lines)
+        total = len(records)
     message_text = (
         f"📅 今日（{today_str}）のお休み\n"
         f"━━━━━━━━━━━━━━\n"
         f"{body_text}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"合計 {total}名"
+        f"合計 {total}名" if total > 0 else "全員出席です！"
     )
     payload = {
         "type": "message",
