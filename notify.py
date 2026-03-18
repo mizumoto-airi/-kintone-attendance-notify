@@ -222,7 +222,7 @@ def send_teams_notification(main_name, sub_name, target_date, members, records, 
             else:
                 d_str = "日付不明"
             monthly_lines.append(f"{d_str}　{name}　{label}")
-        monthly_text = "\n".join(monthly_lines)
+        monthly_text = monthly_lines  # リストのまま保持（1行ずつTextBlockにする）
 
     # お休みがいる場合はwarning（黄）、いない場合はgood（緑）の背景
     holiday_style = "good" if not records else "warning"  # なし=緑、あり=黄
@@ -316,11 +316,22 @@ def send_teams_notification(main_name, sub_name, target_date, members, records, 
                                     "wrap": True,
                                     "weight": "Bolder",
                                 },
-                                {
-                                    "type": "TextBlock",
-                                    "text": monthly_text,
-                                    "wrap": True,
-                                },
+                                # 1行ずつ別々のTextBlockにして確実に改行する
+                                *([
+                                    {
+                                        "type": "TextBlock",
+                                        "text": line,
+                                        "wrap": True,
+                                        "spacing": "None",
+                                    }
+                                    for line in monthly_text
+                                ] if isinstance(monthly_text, list) else [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": monthly_text,
+                                        "wrap": True,
+                                    }
+                                ]),
                             ],
                         },
                     ],
