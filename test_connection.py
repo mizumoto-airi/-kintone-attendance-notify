@@ -1,15 +1,23 @@
-import requests
-import json
+"""
+取得結果の確認用スクリプト（Teamsには送信しない）
+notify.py の get_today_leaves() と get_leave_label() を使って
+実際に取得されるデータをログに表示する
+"""
+import os
+from notify import get_today_leaves, get_leave_label
+from datetime import datetime, timezone, timedelta
 
-SUBDOMAIN = "iu9b8ymlk83t"
-TOKEN_79 = "HmzoN2qoPgXyD5ZpfNLZopUTbrSAl9BUDLmVDRri"
+JST = timezone(timedelta(hours=9))
 
-url = f"https://{SUBDOMAIN}.cybozu.com/k/v1/records.json"
+records = get_today_leaves()
+today_str = datetime.now(JST).strftime("%m/%d").lstrip("0")
 
-res = requests.get(url, headers={"X-Cybozu-API-Token": TOKEN_79}, params={"app": 79})
-records = res.json()["records"]
+print(f"=== {today_str} の休暇申請（{len(records)}件） ===")
 
-print("=== 1件目のレコードの全フィールド ===")
-first = records[0]
-for key, val in first.items():
-    print(f"フィールド名: {key!r:30s} 型: {val.get('type','')!r:20s} 値: {val.get('value')}")
+for record in records:
+    shaiin = record.get("社員", {}).get("value", [])
+    name = shaiin[0].get("name", "不明") if shaiin else "不明"
+    dept_list = record.get("所属部署", {}).get("value", [])
+    dept = dept_list[0].get("name", "") if dept_list else ""
+    label = get_leave_label(record)
+    print(f"・{name}（{dept}）　{label}")

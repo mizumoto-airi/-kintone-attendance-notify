@@ -17,5 +17,9 @@ jobs:
           python-version: '3.11'
       - name: install requests
         run: pip install requests
-      - name: フィールド確認
+      - name: 取得内容を確認（Teams送信なし）
+        env:
+          KINTONE_LEAVE_APP_TOKEN: ${{ secrets.KINTONE_LEAVE_APP_TOKEN }}
+          KINTONE_MEMBER_APP_TOKEN: ${{ secrets.KINTONE_MEMBER_APP_TOKEN }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: python test_connection.py

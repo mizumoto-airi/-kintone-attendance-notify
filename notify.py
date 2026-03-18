@@ -58,11 +58,14 @@ def check_api_connection():
 # ── 今日の休暇申請を取得する関数 ──────────────────────────────
 
 def get_today_leaves():
-    """届出アプリから今日の休暇申請レコードを全件取得する"""
-    today = datetime.now(JST)
+    """届出アプリから今日の休暇申請レコードを取得する"""
+    today_str = datetime.now(JST).strftime("%Y-%m-%d")
+    # kintoneのクエリで「当該日時From」が今日のレコードだけに絞る
+    query = f'当該日時From >= "{today_str}T00:00:00+09:00" and 当該日時From <= "{today_str}T23:59:59+09:00"'
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     params = {
         "app": LEAVE_APP_ID,
+        "query": query,
     }
     response = requests.get(url, headers=get_leave_header(), params=params)
     if not response.ok:
@@ -72,23 +75,12 @@ def get_today_leaves():
 
 
 def get_leave_label(record):
-    """休暇の種別（終日・午前半休・午後半休など）を文字列で返す"""
-    leave_type = record.get("休暇種別", {}).get("value", "")
-    from_str = record.get("From", {}).get("value", "")
-    to_str = record.get("To", {}).get("value", "")
-    time_label = "休暇"
-    if from_str and to_str:
-        from_dt = datetime.fromisoformat(from_str)
-        to_dt = datetime.fromisoformat(to_str)
-        if from_dt.hour <= 9 and to_dt.hour >= 17:
-            time_label = "終日"
-        elif to_dt.hour <= 13:
-            time_label = "午前半休"
-        elif from_dt.hour >= 13:
-            time_label = "午後半休"
-    if leave_type:
-        return f"{leave_type}（{time_label}）"
-    return time_label
+    """休暇の種別ラベルを返す（例：有給（終日）、有給（午前）など）"""
+    leave_type = record.get("休暇種別", {}).get("value", "") or ""
+    unit = record.get("休暇単位", {}).get("value", "") or ""  # 「終日」「午前」「午後」が入っている
+    if leave_type and unit:
+        return f"{leave_type}（{unit}）"
+    return leave_type or unit or "休暇"
 
 
 # ── Teamsに通知を送る関数 ──────────────────────────────────────
@@ -102,12 +94,12 @@ def send_teams_notification(records):
         return
     lines = []
     for record in records:
-        tantousha = record.get("担当者", {}).get("value", [])
-        if isinstance(tantousha, list) and tantousha:
-            name = tantousha[0].get("name", "不明")
-        else:
-            name = str(tantousha) if tantousha else "不明"
-        dept = record.get("所属", {}).get("value", "")
+        # 「社員」フィールドから名前を取得（USER_SELECT型 = リスト形式）
+        shaiin = record.get("社員", {}).get("value", [])
+        name = shaiin[0].get("name", "不明") if shaiin else "不明"
+        # 「所属部署」フィールドから部署名を取得（ORGANIZATION_SELECT型 = リスト形式）
+        dept_list = record.get("所属部署", {}).get("value", [])
+        dept = dept_list[0].get("name", "") if dept_list else ""
         label = get_leave_label(record)
         lines.append(f"・{name}（{dept}）　{label}")
     body_text = "\n".join(lines)
