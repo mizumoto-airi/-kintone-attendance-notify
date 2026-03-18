@@ -1,37 +1,76 @@
 import requests
-import base64
 import os
 from datetime import datetime, timezone, timedelta
 
-KINTONE_SUBDOMAIN = "iu9b8ymlk83t"
-LEAVE_APP_ID = 79
+# ── kintoneの設定 ──────────────────────────────────────────
+KINTONE_SUBDOMAIN = "iu9b8ymlk83t"  # あなたのkintoneのサブドメイン
+LEAVE_APP_ID = 79   # 届出アプリ
+MEMBER_APP_ID = 7   # M社員アプリ
 
-KINTONE_USERNAME = os.environ["KINTONE_USERNAME"]
-KINTONE_PASSWORD = os.environ["KINTONE_PASSWORD"]
+# 環境変数からAPIトークンを取得する
+# （GitHubのSecretsに登録する。コードに直接書いてはいけない！）
+KINTONE_LEAVE_APP_TOKEN = os.environ["KINTONE_LEAVE_APP_TOKEN"]    # 届出アプリ用トークン
+KINTONE_MEMBER_APP_TOKEN = os.environ["KINTONE_MEMBER_APP_TOKEN"]  # M社員アプリ用トークン
 TEAMS_WEBHOOK_URL = os.environ["TEAMS_WEBHOOK_URL"]
 
+# ── 日本時間の設定 ──────────────────────────────────────────
 JST = timezone(timedelta(hours=9))
 
 
-def get_auth_header():
-    credentials = base64.b64encode(
-        f"{KINTONE_USERNAME}:{KINTONE_PASSWORD}".encode()
-    ).decode()
+# ── 認証ヘッダーを作る関数 ────────────────────────────────────
+# 「ヘッダー」= APIリクエストに付ける付加情報。「このトークンを持つ人だよ」とkintoneに証明する
+
+def get_leave_header():
+    """届出アプリ（ID:79）用のヘッダー"""
     return {
-        "X-Cybozu-Authorization": credentials,
+        "X-Cybozu-API-Token": KINTONE_LEAVE_APP_TOKEN,
+        "Content-Type": "application/json",
+    }
+
+def get_member_header():
+    """M社員アプリ（ID:7）用のヘッダー"""
+    return {
+        "X-Cybozu-API-Token": KINTONE_MEMBER_APP_TOKEN,
         "Content-Type": "application/json",
     }
 
 
+# ── API接続確認用の関数 ───────────────────────────────────────
+
+def check_api_connection():
+    """両アプリにつながるか確認する。成功したら件数を表示する"""
+    url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
+    print("=== kintone API接続確認 ===")
+
+    # 届出アプリ（ID:79）
+    print(f"\n[1] 届出アプリ（ID:{LEAVE_APP_ID}）を確認中...")
+    res = requests.get(url, headers=get_leave_header(), params={"app": LEAVE_APP_ID, "totalCount": True})
+    if res.ok:
+        print(f"    接続成功！ 総レコード数: {res.json().get('totalCount', '?')}件")
+    else:
+        print(f"    接続失敗！ エラー: {res.status_code} / {res.text}")
+
+    # M社員アプリ（ID:7）
+    print(f"\n[2] M社員アプリ（ID:{MEMBER_APP_ID}）を確認中...")
+    res = requests.get(url, headers=get_member_header(), params={"app": MEMBER_APP_ID, "totalCount": True})
+    if res.ok:
+        print(f"    接続成功！ 総レコード数: {res.json().get('totalCount', '?')}件")
+    else:
+        print(f"    接続失敗！ エラー: {res.status_code} / {res.text}")
+
+    print("\n=== 確認完了 ===")
+
+
+# ── 今日の休暇申請を取得する関数 ──────────────────────────────
+
 def get_today_leaves():
+    """届出アプリから今日の休暇申請レコードを全件取得する"""
     today = datetime.now(JST)
-    today_start = today.strftime("%Y-%m-%dT00:00:00+09:00")
-    today_end = today.strftime("%Y-%m-%dT23:59:59+09:00")
     url = f"https://{KINTONE_SUBDOMAIN}.cybozu.com/k/v1/records.json"
     params = {
         "app": LEAVE_APP_ID,
     }
-    response = requests.get(url, headers=get_auth_header(), params=params)
+    response = requests.get(url, headers=get_leave_header(), params=params)
     if not response.ok:
         print("kintone error:", response.status_code, response.text)
         response.raise_for_status()
@@ -39,6 +78,7 @@ def get_today_leaves():
 
 
 def get_leave_label(record):
+    """休暇の種別（終日・午前半休・午後半休など）を文字列で返す"""
     leave_type = record.get("休暇種別", {}).get("value", "")
     from_str = record.get("From", {}).get("value", "")
     to_str = record.get("To", {}).get("value", "")
@@ -57,7 +97,10 @@ def get_leave_label(record):
     return time_label
 
 
+# ── Teamsに通知を送る関数 ──────────────────────────────────────
+
 def send_teams_notification(records):
+    """取得した休暇レコードをTeamsに投稿する"""
     today = datetime.now(JST)
     today_str = today.strftime("%m/%d").lstrip("0")
     if not records:
@@ -108,6 +151,8 @@ def send_teams_notification(records):
     print(f"通知送信完了：{total}名分")
 
 
+# ── メイン処理 ────────────────────────────────────────────────
 if __name__ == "__main__":
+    check_api_connection()
     records = get_today_leaves()
     send_teams_notification(records)

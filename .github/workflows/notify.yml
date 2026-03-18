@@ -2,8 +2,8 @@ name: notify
 
 on:
   schedule:
-    - cron: '0 23 * * 0-4'
-  workflow_dispatch:
+    - cron: '0 23 * * 0-4'  # 日本時間 平日8時（UTC 23時）に自動実行
+  workflow_dispatch:         # GitHubの画面から手動実行もできる
 
 jobs:
   notify:
@@ -19,7 +19,7 @@ jobs:
         run: pip install requests
       - name: run script
         env:
-          KINTONE_USERNAME: ${{ secrets.KINTONE_USERNAME }}
-          KINTONE_PASSWORD: ${{ secrets.KINTONE_PASSWORD }}
+          KINTONE_LEAVE_APP_TOKEN: ${{ secrets.KINTONE_LEAVE_APP_TOKEN }}
+          KINTONE_MEMBER_APP_TOKEN: ${{ secrets.KINTONE_MEMBER_APP_TOKEN }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: python notify.py
