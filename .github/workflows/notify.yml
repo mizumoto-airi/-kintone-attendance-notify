@@ -19,10 +19,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install requests
-        run: pip install requests
+        run: pip install requests jpholiday
 
       - name: Run notify script
         env:
+          KINTONE_SUBDOMAIN: ${{ secrets.KINTONE_SUBDOMAIN }}
           KINTONE_LEAVE_APP_TOKEN: ${{ secrets.KINTONE_LEAVE_APP_TOKEN }}
           KINTONE_MEMBER_APP_TOKEN: ${{ secrets.KINTONE_MEMBER_APP_TOKEN }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
