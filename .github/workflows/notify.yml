@@ -2,7 +2,7 @@ name: notify
 
 on:
   schedule:
-    - cron: '* * * * *'   # テスト用：毎分実行
+    - cron: '*/5 * * * *'   # テスト用：5分毎
   workflow_dispatch:
 
 jobs:
