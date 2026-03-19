@@ -1,7 +1,9 @@
 name: notify
 
 on:
-  workflow_dispatch:  # Power Automate または手動で起動する
+  schedule:
+    - cron: '*/5 * * * *'  # テスト：5分毎
+  workflow_dispatch:
 
 jobs:
   notify:
