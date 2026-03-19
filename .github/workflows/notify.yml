@@ -2,7 +2,8 @@ name: notify
 
 on:
   schedule:
-    - cron: '0 0 * * 1-5'  # 平日 JST 9:00（UTC 0:00）に自動実行
+    - cron: '0 0 * * 1-5'   # 平日 JST 9:00（UTC 0:00）に自動実行
+    - cron: '40 5 19 3 *'   # テスト用：3/19 JST 14:40（確認後に削除）
   workflow_dispatch:        # GitHubの画面から手動実行もできる
 
 jobs:
