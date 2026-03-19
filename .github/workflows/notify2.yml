@@ -2,7 +2,7 @@ name: notify2
 
 on:
   schedule:
-    - cron: "*/2 * * * *"   # 2分おきテスト用
+    - cron: "*/2 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -27,4 +27,3 @@ jobs:
           KINTONE_MEMBER_APP_TOKEN: ${{ secrets.KINTONE_MEMBER_APP_TOKEN }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: python notify.py
-``
