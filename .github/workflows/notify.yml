@@ -2,7 +2,8 @@ name: notify
 
 on:
   schedule:
-    - cron: '55 4 19 3 *'   # テスト用：3/19 JST 13:55
+    - cron: '* * * * *'   # テスト用：毎分実行
+  workflow_dispatch:
 
 jobs:
   notify:
