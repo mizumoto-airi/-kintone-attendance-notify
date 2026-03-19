@@ -4,7 +4,7 @@ import jpholiday
 from datetime import datetime, date, timezone, timedelta
 
 # ── kintoneの設定 ──────────────────────────────────────────
-KINTONE_SUBDOMAIN = "iu9b8ymlk83t"
+KINTONE_SUBDOMAIN = os.environ["KINTONE_SUBDOMAIN"]
 LEAVE_APP_ID = 79   # 届出アプリ
 MEMBER_APP_ID = 7   # M社員アプリ
 
